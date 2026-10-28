@@ -1,0 +1,305 @@
+// OnlineMart schema (Prisma 7, PostgreSQL). Extra constraints that Prisma cannot express
+// (partial unique indexes, CHECK constraints, sequences) live in prisma/constraints.sql and are
+// appended to the init migration by scripts/append-constraints.mjs.
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  CUSTOMER
+}
+
+enum DeliveryType {
+  DELIVERY
+  PICKUP
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PROCESSING
+  READY_FOR_PICKUP
+  READY_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+  REFUND_PENDING
+}
+
+enum PaymentStatus {
+  UNPAID
+  PAID
+  FAILED
+  CANCELLED
+  REFUND_PENDING
+  REFUNDED
+}
+
+enum CancelActor {
+  CUSTOMER
+  ADMIN
+  SYSTEM
+}
+
+enum StockStatus {
+  IN_STOCK
+  LOW_STOCK
+  OUT_OF_STOCK
+}
+
+enum InventoryMovementType {
+  RECEIVED
+  ADJUSTMENT_INCREASE
+  ADJUSTMENT_DECREASE
+  CONSUMED
+  RELEASED
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  name         String   @db.VarChar(100)
+  email        String   @unique @db.VarChar(255)
+  passwordHash String
+  role         Role     @default(CUSTOMER)
+  isActive     Boolean  @default(true)
+  totalOrders  Int      @default(0)
+  totalSpent   Decimal  @default(0) @db.Decimal(10, 2)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  addresses       Address[]
+  cart            Cart?
+  orders          Order[]
+  idempotencyKeys IdempotencyKey[]
+
+  @@map("users")
+}
+
+model Address {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @db.Uuid
+  addressLine String   @db.VarChar(100)
+  city        String   @db.VarChar(30)
+  county      String   @db.VarChar(30)
+  postcode    String   @db.VarChar(20)
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("addresses")
+}
+
+model Category {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique @db.VarChar(60)
+  slug      String   @unique @db.VarChar(80)
+  parentId  String?  @db.Uuid
+  depth     Int      @default(0)
+  path      String   @db.VarChar(120)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children Category[] @relation("CategoryTree")
+  products Product[]
+
+  @@index([parentId])
+  @@index([isActive])
+  @@map("categories")
+}
+
+model Product {
+  id                   String   @id @default(uuid()) @db.Uuid
+  name                 String   @db.VarChar(120)
+  slug                 String   @unique @db.VarChar(160)
+  sku                  String   @unique @db.VarChar(20)
+  description          String?  @db.VarChar(2000)
+  categoryId           String   @db.Uuid
+  price                Decimal  @db.Decimal(10, 2)
+  minimumOrderQuantity Int      @default(1)
+  maximumOrderQuantity Int      @default(20)
+  isActive             Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  category   Category    @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  inventory  Inventory?
+  cartItems  CartItem[]
+  orderItems OrderItem[]
+
+  @@unique([name, categoryId])
+  @@index([categoryId, isActive])
+  @@index([isActive, createdAt])
+  @@index([isActive, price])
+  @@map("products")
+}
+
+model Inventory {
+  id                String      @id @default(uuid()) @db.Uuid
+  productId         String      @unique @db.Uuid
+  qtyOnHand         Int         @default(0)
+  lowStockThreshold Int         @default(10)
+  status            StockStatus @default(OUT_OF_STOCK)
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  product      Product                @relation(fields: [productId], references: [id], onDelete: Restrict)
+  transactions InventoryTransaction[]
+
+  @@index([status])
+  @@map("inventories")
+}
+
+model InventoryTransaction {
+  id            String                @id @default(uuid()) @db.Uuid
+  inventoryId   String                @db.Uuid
+  type          InventoryMovementType
+  quantity      Int
+  quantityAfter Int
+  reason        String?               @db.VarChar(40)
+  note          String?               @db.VarChar(500)
+  orderId       String?               @db.Uuid
+  createdAt     DateTime              @default(now())
+
+  inventory Inventory @relation(fields: [inventoryId], references: [id], onDelete: Restrict)
+
+  @@index([inventoryId, createdAt])
+  @@index([orderId, type])
+  @@map("inventory_transactions")
+}
+
+model Cart {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @unique @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items CartItem[]
+
+  @@map("carts")
+}
+
+model CartItem {
+  id        String   @id @default(uuid()) @db.Uuid
+  cartId    String   @db.Uuid
+  productId String   @db.Uuid
+  quantity  Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cart    Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@unique([cartId, productId])
+  @@map("cart_items")
+}
+
+model Order {
+  id                String        @id @default(uuid()) @db.Uuid
+  orderNumber       String        @unique @db.VarChar(20)
+  userId            String        @db.Uuid
+  deliveryType      DeliveryType
+  status            OrderStatus   @default(PENDING)
+  paymentStatus     PaymentStatus @default(UNPAID)
+  subtotal          Decimal       @db.Decimal(10, 2)
+  shippingCost      Decimal       @db.Decimal(10, 2)
+  total             Decimal       @db.Decimal(10, 2)
+  customerNotes     String?       @db.VarChar(500)
+  pickupScheduledAt DateTime?
+  paymentExpiresAt  DateTime
+  cancelReason      String?       @db.VarChar(40)
+  cancelNote        String?       @db.VarChar(500)
+  cancelledBy       CancelActor?
+  confirmedAt       DateTime?
+  processedAt       DateTime?
+  readyAt           DateTime?
+  deliveredAt       DateTime?
+  cancelledAt       DateTime?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  user           User            @relation(fields: [userId], references: [id], onDelete: Restrict)
+  items          OrderItem[]
+  address        OrderAddress?
+  payment        Payment?
+  idempotencyKey IdempotencyKey?
+
+  @@index([userId, createdAt])
+  @@index([status, paymentExpiresAt])
+  @@index([createdAt])
+  @@map("orders")
+}
+
+model OrderItem {
+  id          String  @id @default(uuid()) @db.Uuid
+  orderId     String  @db.Uuid
+  productId   String  @db.Uuid
+  productName String  @db.VarChar(120)
+  sku         String  @db.VarChar(20)
+  unitPrice   Decimal @db.Decimal(10, 2)
+  quantity    Int
+  lineTotal   Decimal @db.Decimal(10, 2)
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@map("order_items")
+}
+
+model OrderAddress {
+  id          String @id @default(uuid()) @db.Uuid
+  orderId     String @unique @db.Uuid
+  addressLine String @db.VarChar(100)
+  city        String @db.VarChar(30)
+  county      String @db.VarChar(30)
+  postcode    String @db.VarChar(20)
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("order_addresses")
+}
+
+model Payment {
+  id         String        @id @default(uuid()) @db.Uuid
+  orderId    String        @unique @db.Uuid
+  amount     Decimal       @db.Decimal(10, 2)
+  status     PaymentStatus @default(UNPAID)
+  gatewayRef String        @unique @db.VarChar(80)
+  paidAt     DateTime?
+  refundedAt DateTime?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  @@index([status])
+  @@map("payments")
+}
+
+model IdempotencyKey {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @db.Uuid
+  key         String   @db.VarChar(64)
+  requestHash String   @db.VarChar(64)
+  orderId     String?  @unique @db.Uuid
+  createdAt   DateTime @default(now())
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order Order? @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, key])
+  @@map("idempotency_keys")
+}

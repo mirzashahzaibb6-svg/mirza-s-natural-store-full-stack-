@@ -1,0 +1,72 @@
+@import "tailwindcss";
+
+@theme{
+  --color-wine-950: #0e0509;
+  --color-wine-900: #1d0a12;
+  --color-wine-800: #2c0f1b;
+  --color-wine-700: #5e1f33;
+  --color-brass: #cfa95a;
+  --color-pearl: #f3e9d8;
+  --color-mute: #b3a08f;
+  --color-line: rgba(243, 233, 216, 0.14);
+  --font-display: var(--font-bodoni), Georgia, serif;
+  --font-sans: var(--font-jost), system-ui, sans-serif;
+}
+
+:root { color-scheme: dark; }
+html { background: var(--color-wine-950); }
+body { background: var(--color-wine-950); color: var(--color-pearl); font-family: var(--font-sans); overflow-x: hidden; }
+h1, h2, h3, .font-display { font-family: var(--font-display); font-weight: 500; line-height: 0.95; }
+:focus-visible { outline: 2px solid var(--color-brass); outline-offset: 3px; }
+
+/* --- Lantern: mouse-linked light that reveals a gold arabesque pattern (no cursor circle) --- */
+.lantern, .glow { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+.lantern {
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='72' fill='none' stroke='%23cfa95a' stroke-width='1'%3E%3Crect x='18' y='18' width='36' height='36'/%3E%3Crect x='18' y='18' width='36' height='36' transform='rotate(45 36 36)'/%3E%3Ccircle cx='36' cy='36' r='9'/%3E%3C/svg%3E");
+  opacity: 0.6;
+  -webkit-mask-image: radial-gradient(320px at var(--mx, 50%) var(--my, 40%), #000, transparent 72%);
+  mask-image: radial-gradient(320px at var(--mx, 50%) var(--my, 40%), #000, transparent 72%);
+}
+.glow { background: radial-gradient(560px at var(--mx, 50%) var(--my, 40%), rgba(207, 169, 90, 0.14), transparent 70%); }
+
+/* --- Hero: nested arches that draw themselves, then drift with the mouse --- */
+@keyframes draw { to { stroke-dashoffset: 0; } }
+@keyframes breathe { to { opacity: 0.55; } }
+.arches { position: absolute; left: 50%; bottom: 0; width: min(780px, 98vw); height: 94%; transform: translateX(-50%) scale(var(--sz, 1)); transform-origin: 50% 100%; opacity: var(--op, 1); }
+.arches svg { width: 100%; height: 100%; overflow: visible; }
+.arches path { fill: none; stroke: var(--color-brass); stroke-width: 1.2; stroke-dasharray: 1600; stroke-dashoffset: 1600; animation: draw 2.6s cubic-bezier(0.4, 0, 0.2, 1) forwards; animation-delay: calc(var(--i) * 0.18s + 0.3s); }
+.arches path.core { fill: url(#core); stroke: none; stroke-dasharray: none; stroke-dashoffset: 0; animation: breathe 6s ease-in-out infinite alternate; }
+.hero-title { transform: translateY(var(--ty, 0px)); opacity: var(--op, 1); }
+.ch { display: inline-block; opacity: 0; transform: translateY(46px); animation: chIn 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards; animation-delay: calc(var(--i) * 70ms + 0.5s); transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1), color 0.3s; }
+@keyframes chIn { to { opacity: 1; transform: none; } }
+.fade-up { opacity: 0; transform: translateY(20px); animation: fadeUp 1s 1.6s forwards; }
+@keyframes fadeUp { to { opacity: 1; transform: none; } }
+
+/* --- Product cards: arch window with a light that follows the pointer --- */
+.arch-card { position: relative; overflow: hidden; border: 1px solid var(--color-line); border-radius: 200px 200px 26px 26px; background: linear-gradient(180deg, rgba(29, 10, 18, 0.62), transparent); transition: border-color 0.4s, transform 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
+.arch-card:hover { border-color: var(--color-brass); transform: translateY(-6px); }
+.arch-card::after { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity 0.4s; background: radial-gradient(260px at var(--px, 50%) var(--py, 30%), rgba(255, 233, 180, 0.22), transparent 70%); }
+.arch-card:hover::after { opacity: 1; }
+.arch-art { aspect-ratio: 1; border-radius: 190px 190px 16px 16px; display: grid; place-items: end center; padding-bottom: 10%; background: radial-gradient(circle at 50% 100%, rgba(140, 47, 69, 0.55), transparent 70%), var(--color-wine-900); }
+.arch-art svg { width: 58%; filter: drop-shadow(0 18px 20px rgba(0, 0, 0, 0.45)); transform: translate(calc(var(--tx, 0) * 16px), calc(var(--ty2, 0) * 10px)); transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.arch-box { border: 1px solid var(--color-brass); border-radius: 240px 240px 30px 30px; background: rgba(29, 10, 18, 0.62); backdrop-filter: blur(22px); }
+
+/* --- Buttons: liquid fill on hover --- */
+.btn-fill { position: relative; overflow: hidden; isolation: isolate; }
+.btn-fill::before { content: ""; position: absolute; inset: 0; z-index: -1; background: var(--color-brass); transform: translateY(101%); border-radius: 50% 50% 0 0 / 100% 100% 0 0; transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), border-radius 0.6s; }
+.btn-fill:hover::before, .btn-fill.solid::before { transform: none; border-radius: 0; }
+.btn-fill:hover:not(:disabled), .btn-fill.solid { color: var(--color-wine-950); }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner { width: 18px; height: 18px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: spin 0.7s linear infinite; }
+@keyframes shimmer { 0% { opacity: 0.35; } 50% { opacity: 0.7; } 100% { opacity: 0.35; } }
+.skeleton { background: var(--color-wine-800); border-radius: 12px; animation: shimmer 1.4s ease-in-out infinite; }
+
+dialog { background: var(--color-wine-900); color: var(--color-pearl); border: 1px solid var(--color-line); border-radius: 24px; padding: 0; max-width: min(560px, 94vw); width: 100%; margin: auto; }
+dialog::backdrop { background: rgba(0, 0, 0, 0.65); backdrop-filter: blur(3px); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-delay: 0ms !important; transition-duration: 0.01ms !important; }
+  .arches path { stroke-dashoffset: 0; }
+  .ch, .fade-up { opacity: 1; transform: none; }
+}
